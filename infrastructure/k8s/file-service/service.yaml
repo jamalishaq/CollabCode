@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: file-service
+  namespace: collabcode
+spec:
+  selector:
+    app: file-service
+  ports:
+    - port: 3003
+      targetPort: 3003

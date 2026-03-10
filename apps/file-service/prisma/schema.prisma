@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model File {
+  id        String    @id @default(uuid())
+  projectId String
+  parentId  String?
+  name      String
+  path      String
+  language  String
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  versions  FileVersion[]
+
+  @@index([projectId])
+  @@index([parentId])
+}
+
+model FileVersion {
+  id          String   @id @default(uuid())
+  fileId       String
+  version      Int
+  contentHash  String
+  createdBy    String
+  createdAt    DateTime @default(now())
+  file         File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+}

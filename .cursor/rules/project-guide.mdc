@@ -1,0 +1,540 @@
+---
+alwaysApply: true
+---
+
+# ------------------------------------------------------------
+# SECTION 1: PROJECT OVERVIEW & ARCHITECTURE CONTEXT
+# ------------------------------------------------------------
+
+project:
+  name: "CollabCode — Interactive Online Code Editor"
+  type: "Microservices Monorepo"
+  description: >
+    A real-time collaborative online code editor that supports
+    workspaces, projects, file editing with locking, role-based
+    access control, and sandboxed code execution.
+
+architecture:
+  pattern: "Microservices"
+  communication:
+    sync: "REST over HTTPS"
+    async: "WebSockets (WSS) + Message Queue (Kafka)"
+  services:
+    - name: "api-gateway"
+      language: "TypeScript (Node.js)"
+      role: "Single entry point. Handles JWT validation, rate limiting, and routing."
+
+    - name: "auth-service"
+      language: "TypeScript (Node.js)"
+      role: "User registration, login, JWT issuance, OAuth2 (GitHub/Google)."
+
+    - name: "workspace-service"
+      language: "TypeScript (Node.js)"
+      role: "CRUD for workspaces and projects. Manages membership and RBAC roles."
+
+    - name: "file-service"
+      language: "TypeScript (Node.js)"
+      role: "File CRUD, file locking via Redis, version history, object storage I/O."
+
+    - name: "collaboration-service"
+      language: "Go"
+      role: "Real-time WebSocket connections, CRDT sync via Yjs protocol bridge, presence."
+
+    - name: "execution-service"
+      language: "Go"
+      role: "Receives code payloads, spins up sandboxed Docker containers, streams output."
+
+    - name: "notification-service"
+      language: "TypeScript (Node.js)"
+      role: "Consumes Kafka events and pushes notifications (email, in-app) to users."
+
+    - name: "frontend"
+      language: "TypeScript (React)"
+      role: "SPA. Monaco Editor integration, real-time collaboration UI, workspace management."
+
+  storage:
+    primary_db: "PostgreSQL"
+    cache_and_locks: "Redis"
+    file_storage: "S3-compatible Object Storage"
+    message_queue: "Kafka"
+
+
+# ------------------------------------------------------------
+# SECTION 2: MONOREPO STRUCTURE RULES
+# ------------------------------------------------------------
+
+structure:
+  enforce: true
+  root_layout: |
+    /
+    ├── .cursor/
+    │   └── rules                  ← This file
+    ├── apps/
+    │   ├── frontend/              ← React TypeScript SPA
+    │   ├── api-gateway/           ← Node.js TypeScript
+    │   ├── auth-service/          ← Node.js TypeScript
+    │   ├── workspace-service/     ← Node.js TypeScript
+    │   ├── file-service/          ← Node.js TypeScript
+    │   ├── notification-service/  ← Node.js TypeScript
+    │   ├── collaboration-service/ ← Go
+    │   └── execution-service/     ← Go
+    ├── packages/
+    │   ├── shared-types/          ← Shared TypeScript interfaces & enums
+    │   ├── shared-utils/          ← Shared utility functions (non-service-specific)
+    │   └── shared-config/         ← Shared env schema, constants
+    ├── infrastructure/
+    │   ├── docker/                ← Dockerfiles per service
+    │   ├── k8s/                   ← Kubernetes manifests
+    │   └── terraform/             ← Cloud infrastructure as code
+    ├── docs/
+    │   ├── architecture.md
+    │   ├── api-contracts/         ← OpenAPI specs per service
+    │   └── adr/                   ← Architecture Decision Records
+    ├── scripts/                   ← Dev, build, and deployment scripts
+    ├── docker-compose.yml         ← Local dev orchestration
+    └── turbo.json                 ← Turborepo pipeline config
+
+  rules:
+    - "NEVER place business logic in the api-gateway. It routes and validates only."
+    - "NEVER import code from one service into another service directly."
+    - "ALL shared types MUST live in packages/shared-types. Never duplicate type definitions."
+    - "Each service MUST have its own package.json or go.mod — fully independent."
+    - "Infrastructure files belong in /infrastructure only — never inside a service directory."
+
+
+# ------------------------------------------------------------
+# SECTION 3: NODE.JS / TYPESCRIPT SERVICE RULES
+# ------------------------------------------------------------
+
+nodejs_typescript:
+  applies_to:
+    - "apps/api-gateway"
+    - "apps/auth-service"
+    - "apps/workspace-service"
+    - "apps/file-service"
+    - "apps/notification-service"
+
+  tsconfig:
+    strict: true
+    noImplicitAny: true
+    noUnusedLocals: true
+    noUnusedParameters: true
+    exactOptionalPropertyTypes: true
+
+  project_layout: |
+    service/
+    ├── src/
+    │   ├── controllers/    ← HTTP request handlers only. No business logic.
+    │   ├── services/       ← Business logic layer
+    │   ├── repositories/   ← All database queries live here (no raw SQL elsewhere)
+    │   ├── middleware/     ← Express/Fastify middleware (auth, validation, error handling)
+    │   ├── routes/         ← Route definitions and controller bindings
+    │   ├── models/         ← Prisma models or type definitions
+    │   ├── events/         ← Kafka producers and consumers
+    │   ├── utils/          ← Pure utility functions (no side effects)
+    │   ├── config/         ← Environment variable parsing and validation (Zod)
+    │   └── index.ts        ← Entry point
+    ├── tests/
+    │   ├── unit/
+    │   └── integration/
+    ├── .env.example
+    ├── package.json
+    └── tsconfig.json
+
+  coding_rules:
+    architecture:
+      - "Controllers MUST only handle HTTP concerns: parse request, call service, return response."
+      - "Services MUST NOT directly query the database. Always go through a Repository."
+      - "Repositories MUST NOT contain business logic — only data access methods."
+      - "All environment variables MUST be parsed and validated with Zod in config/index.ts."
+      - "NEVER use process.env directly outside of config/. Always import from config."
+
+    error_handling:
+      - "NEVER expose raw database errors, stack traces, or internal error messages to API responses."
+      - "Use a centralized error handler middleware. Never handle errors ad-hoc in controllers."
+      - "Define a custom AppError class extending Error with statusCode and isOperational fields."
+      - "All async route handlers MUST be wrapped with a catchAsync utility to avoid unhandled rejections."
+      - "Return consistent error shape: { error: { code: string, message: string, details?: any } }"
+
+    api_design:
+      - "Follow RESTful conventions strictly: GET (read), POST (create), PUT (full update), PATCH (partial update), DELETE."
+      - "Use correct HTTP status codes: 200 (ok), 201 (created), 204 (no content), 400 (bad request), 401 (unauthenticated), 403 (forbidden), 404 (not found), 409 (conflict), 422 (validation error), 500 (server error)."
+      - "ALL API responses MUST follow this uniform envelope: { data: T | null, error: ErrorShape | null, meta?: PaginationMeta }"
+      - "NEVER return arrays at the top level of a response. Always wrap in { data: [] }."
+      - "All list endpoints MUST support pagination: ?page=1&limit=20."
+      - "Use plural nouns for resource routes: /workspaces, /projects, /files — never verbs."
+
+    validation:
+      - "Validate ALL incoming request bodies, params, and query strings using Zod schemas."
+      - "Validation schemas MUST be defined in a dedicated schemas/ file, not inline in controllers."
+      - "Reject requests that contain unknown/extra fields (Zod: .strict())."
+
+    security:
+      - "JWT verification MUST happen in the api-gateway middleware only — never inside individual services."
+      - "NEVER store passwords in plain text. Always use bcrypt with a minimum cost factor of 12."
+      - "NEVER log sensitive data: passwords, tokens, credit cards, PII."
+      - "All user-supplied strings that touch a database MUST go through parameterized queries — never string interpolation."
+      - "Set security headers on all responses: use the helmet middleware."
+      - "Implement rate limiting at the api-gateway for all public endpoints."
+
+    naming:
+      - "Files: kebab-case (e.g., file-lock.service.ts)"
+      - "Classes: PascalCase (e.g., FileLockService)"
+      - "Functions and variables: camelCase (e.g., acquireFileLock)"
+      - "Constants: SCREAMING_SNAKE_CASE (e.g., MAX_LOCK_TTL_SECONDS)"
+      - "Interfaces: PascalCase prefixed with 'I' only for dependency injection (e.g., IFileRepository)"
+      - "Types: PascalCase (e.g., WorkspaceRole)"
+      - "Enums: PascalCase with PascalCase values (e.g., enum AccessLevel { Owner, Editor, Viewer })"
+
+    documentation:
+      - "Every exported function, class, and interface MUST have a JSDoc comment."
+      - "JSDoc MUST include @param, @returns, and @throws where applicable."
+      - "Every service MUST have a README.md explaining its purpose, endpoints, and environment variables."
+      - "All environment variables MUST be documented in .env.example with descriptions."
+
+
+# ------------------------------------------------------------
+# SECTION 4: GO SERVICE RULES
+# ------------------------------------------------------------
+
+golang:
+  applies_to:
+    - "apps/collaboration-service"
+    - "apps/execution-service"
+
+  go_version: "1.22+"
+
+  project_layout: |
+    service/
+    ├── cmd/
+    │   └── server/
+    │       └── main.go         ← Entry point only. Wire dependencies here.
+    ├── internal/
+    │   ├── handler/            ← HTTP/WebSocket handlers (thin layer)
+    │   ├── service/            ← Business logic
+    │   ├── repository/         ← Data access (Redis, DB)
+    │   ├── domain/             ← Domain types, interfaces, errors
+    │   ├── middleware/         ← HTTP middleware
+    │   └── config/             ← Config parsing from environment
+    ├── pkg/
+    │   └── (reusable packages safe for external use)
+    ├── tests/
+    ├── Dockerfile
+    ├── go.mod
+    └── go.sum
+
+  coding_rules:
+    architecture:
+      - "Follow standard Go project layout strictly (cmd/, internal/, pkg/)."
+      - "Business logic belongs in internal/service/ — never in handlers."
+      - "All external dependencies (Redis, DB) MUST be accessed via interfaces defined in internal/domain/."
+      - "Use dependency injection — never use global variables for dependencies."
+      - "main.go wires dependencies only. No business logic in main.go."
+
+    error_handling:
+      - "NEVER ignore errors. Every error MUST be handled or explicitly propagated."
+      - "Use fmt.Errorf with %w to wrap errors for context: fmt.Errorf('acquireFileLock: %w', err)"
+      - "Define sentinel errors in domain/ for expected error cases (e.g., ErrFileLocked, ErrNotFound)."
+      - "Use errors.Is() and errors.As() for error type checking — never string comparison."
+      - "Log errors with structured logging (slog or zap). Never use fmt.Println for errors."
+
+    concurrency:
+      - "Always use context.Context as the first parameter for any function that does I/O."
+      - "NEVER create goroutines without a mechanism to track and stop them (use context cancellation or WaitGroups)."
+      - "Protect shared state with sync.Mutex or sync.RWMutex. Document the lock scope with comments."
+      - "Use channels for communication between goroutines; use mutexes for state protection."
+      - "NEVER use time.Sleep in production logic. Use ticker or context deadline instead."
+
+    security:
+      - "NEVER trust user input in the execution-service. Sanitize and validate before container invocation."
+      - "Execution containers MUST have: no network access, max CPU 0.5 core, max memory 128MB, max runtime 10 seconds."
+      - "NEVER expose internal Go errors directly in HTTP responses."
+      - "Use crypto/rand for any random token generation — never math/rand."
+
+    naming:
+      - "Follow Go naming conventions strictly."
+      - "Exported identifiers: PascalCase (e.g., AcquireFileLock)"
+      - "Unexported identifiers: camelCase (e.g., validatePayload)"
+      - "Interfaces: describe behavior with -er suffix where natural (e.g., FileLockAcquirer, CodeRunner)"
+      - "Packages: short, lowercase, no underscores (e.g., handler, service, domain)"
+
+    documentation:
+      - "Every exported function and type MUST have a GoDoc comment starting with the identifier name."
+      - "Complex algorithms (e.g., CRDT merge, container lifecycle) MUST have inline comments explaining the why."
+      - "All environment variables MUST be listed in a .env.example with descriptions."
+
+
+# ------------------------------------------------------------
+# SECTION 5: FRONTEND (REACT / TYPESCRIPT) RULES
+# ------------------------------------------------------------
+
+frontend:
+  applies_to:
+    - "apps/frontend"
+
+  framework: "React 18+ with TypeScript"
+  editor_engine: "Monaco Editor (@monaco-editor/react)"
+  state_management: "Zustand (global) + React Query (server state)"
+  styling: "Tailwind CSS + CSS Modules for component-specific styles"
+  realtime: "Socket.io-client for WebSocket communication"
+
+  project_layout: |
+    frontend/src/
+    ├── components/
+    │   ├── ui/               ← Reusable, dumb UI components (Button, Modal, etc.)
+    │   └── features/         ← Feature-specific components (Editor, FileTree, etc.)
+    ├── pages/                ← Route-level page components
+    ├── hooks/                ← Custom React hooks
+    ├── stores/               ← Zustand store definitions
+    ├── services/             ← API call functions (no fetch() outside this directory)
+    ├── types/                ← Frontend-specific TypeScript types (import shared from packages/)
+    ├── utils/                ← Pure utility functions
+    ├── constants/            ← App-wide constants
+    └── assets/               ← Static assets
+
+  coding_rules:
+    components:
+      - "Prefer functional components with hooks. NEVER use class components."
+      - "Each component lives in its own folder: ComponentName/index.tsx + ComponentName.module.css."
+      - "NEVER put business logic or API calls directly inside components. Use custom hooks."
+      - "Props interfaces MUST be explicitly typed. NEVER use 'any' for props."
+      - "Components MUST be pure and predictable given the same props."
+      - "Split large components: if a component exceeds 150 lines, it MUST be decomposed."
+
+    state:
+      - "Server state (API data) is managed exclusively by React Query — never manually with useState."
+      - "Global client state (auth, active workspace, editor settings) lives in Zustand stores."
+      - "Local UI state (modal open, hover, toggle) uses useState or useReducer within the component."
+      - "NEVER store server-fetched data in Zustand — that is React Query's responsibility."
+
+    editor:
+      - "Monaco Editor instance MUST be accessed via a ref — never stored in React state."
+      - "File lock status MUST be visually indicated: locked files show a lock icon and are read-only in Monaco."
+      - "All Monaco editor options MUST be defined in a central editorConfig.ts — never inline."
+      - "Language mode, theme, and keybindings must be configurable per-user preference."
+
+    api_and_realtime:
+      - "ALL fetch/axios calls MUST live in services/. Components and hooks call service functions only."
+      - "Every API service function MUST be typed with explicit request and response types from shared-types."
+      - "WebSocket events MUST be typed. Define a discriminated union for all event types."
+      - "Optimistic updates are encouraged for file saves — always roll back on error."
+
+    security:
+      - "NEVER store JWT tokens in localStorage. Use httpOnly cookies only."
+      - "NEVER interpolate user content into innerHTML. Use React's JSX rendering."
+      - "Sanitize any user-generated content rendered as HTML (e.g., markdown previews) with DOMPurify."
+
+    naming:
+      - "Component files: PascalCase (e.g., FileTree.tsx)"
+      - "Hook files: camelCase prefixed with 'use' (e.g., useFileLock.ts)"
+      - "Store files: camelCase suffixed with 'Store' (e.g., workspaceStore.ts)"
+      - "Service files: camelCase suffixed with 'Service' or 'Api' (e.g., fileService.ts)"
+      - "CSS module classes: camelCase (e.g., styles.editorContainer)"
+
+
+# ------------------------------------------------------------
+# SECTION 6: DOMAIN-SPECIFIC RULES
+# ------------------------------------------------------------
+
+domain_rules:
+
+  file_locking:
+    description: "Pessimistic file locking to prevent concurrent edits."
+    rules:
+      - "File locks are owned by the file-service ONLY. No other service reads or writes lock state."
+      - "Locks are stored in Redis with key pattern: lock:file:{fileId} and value: { userId, acquiredAt }."
+      - "Lock TTL is 30 seconds, auto-renewed by the client every 15 seconds while editing."
+      - "Lock acquisition MUST be atomic — use Redis SET NX (set if not exists)."
+      - "On file close or save, the lock MUST be explicitly released via DEL."
+      - "If a lock TTL expires without renewal, it is considered abandoned and auto-released."
+      - "The API MUST return HTTP 409 Conflict when a client attempts to edit a locked file."
+      - "Lock state MUST be broadcast to all workspace collaborators via WebSocket so UIs update instantly."
+
+  access_control:
+    description: "Role-Based Access Control at workspace and project level."
+    roles:
+      - name: "Owner"
+        permissions: ["read", "write", "delete", "manage_members", "delete_workspace"]
+      - name: "Editor"
+        permissions: ["read", "write"]
+      - name: "Viewer"
+        permissions: ["read"]
+    rules:
+      - "RBAC enforcement happens in the workspace-service on every mutating operation."
+      - "The api-gateway verifies JWT authenticity only — it does NOT check RBAC roles."
+      - "Project-level roles override workspace-level roles when more restrictive."
+      - "Every controller action that mutates data MUST call an authorization check before proceeding."
+      - "Authorization logic MUST live in a dedicated AuthorizationService — never inline in controllers."
+      - "Owner role can only be transferred, never directly assigned by a non-owner."
+
+  code_execution:
+    description: "Secure sandboxed code execution."
+    rules:
+      - "Each execution request spawns a NEW ephemeral Docker container — containers are NEVER reused."
+      - "Containers MUST be destroyed immediately after execution completes or times out."
+      - "Hard limits per execution: CPU 0.5 core, memory 128MB, timeout 10 seconds, no network."
+      - "Supported languages are defined in a static registry in execution-service/internal/domain/runtimes.go."
+      - "The execution payload includes: language, code (string), stdin (optional string)."
+      - "The execution response includes: stdout, stderr, exitCode, executionTimeMs."
+      - "NEVER execute code as root inside the container. Use a dedicated non-root user."
+      - "All execution requests MUST be logged with userId, language, and timestamp for audit."
+
+  collaboration:
+    description: "Real-time multi-user file editing and presence."
+    rules:
+      - "CRDT-based document sync using Yjs. NEVER implement custom OT or diff/patch logic."
+      - "WebSocket connections are managed exclusively by the collaboration-service."
+      - "Each WebSocket room maps to a single fileId. Users join a room when they open a file."
+      - "Presence data (who is online, cursor positions) is stored in Redis and broadcast on change."
+      - "If a user loses WebSocket connection, they are removed from presence after 5 seconds."
+      - "The collaboration-service MUST NOT persist file content — it only syncs state. The file-service persists."
+
+
+# ------------------------------------------------------------
+# SECTION 7: DATABASE RULES
+# ------------------------------------------------------------
+
+database:
+  primary: "PostgreSQL via Prisma ORM (Node.js services)"
+  cache: "Redis via ioredis (Node.js) / go-redis (Go)"
+
+  rules:
+    - "ALL database queries MUST go through Repository classes. No raw queries in services or controllers."
+    - "Use Prisma migrations for ALL schema changes. NEVER alter the database manually."
+    - "Every table MUST have: id (UUID), createdAt (timestamp), updatedAt (timestamp)."
+    - "Use soft deletes (deletedAt nullable timestamp) for Workspaces, Projects, and Files."
+    - "ALL foreign keys MUST have explicit ON DELETE behavior defined (CASCADE or RESTRICT)."
+    - "Add database indexes for all foreign key columns and any column used in WHERE clauses."
+    - "NEVER run N+1 queries. Use Prisma's include/select or joins to batch-load related data."
+    - "Transactions MUST be used for any operation that touches more than one table."
+    - "Database credentials MUST only exist in environment variables — never hardcoded."
+    - "Connection pooling MUST be configured. Default pool size: min 2, max 10 per service."
+
+  redis_key_conventions:
+    - "session:{userId}          → User session data"
+    - "lock:file:{fileId}        → File lock state"
+    - "presence:{workspaceId}    → Active users in workspace"
+    - "ratelimit:{ip}:{route}    → Rate limit counters"
+    - "refresh:{userId}          → Refresh token store"
+
+
+# ------------------------------------------------------------
+# SECTION 8: TESTING RULES
+# ------------------------------------------------------------
+
+testing:
+  philosophy: "Test behavior, not implementation. Tests are first-class code."
+
+  requirements:
+    - "Every service function with business logic MUST have unit tests."
+    - "Every API endpoint MUST have at least one integration test covering the happy path and one error case."
+    - "File locking logic MUST have unit tests covering: acquire, conflict (409), TTL expiry, release."
+    - "RBAC logic MUST have unit tests for each role attempting each permission."
+    - "Code execution sandbox MUST have integration tests verifying resource limits are enforced."
+
+  rules:
+    - "Unit tests MUST mock all external dependencies (database, Redis, external APIs)."
+    - "Integration tests MUST use a real test database (Docker Compose) — never mock the DB in integration tests."
+    - "Test file naming: *.test.ts (unit) and *.integration.test.ts (integration) for Node.js."
+    - "Go test files follow standard convention: *_test.go in the same package."
+    - "NEVER test implementation details (private function internals). Test inputs and outputs only."
+    - "Each test MUST be independent and idempotent — no shared mutable state between tests."
+    - "Use descriptive test names: describe('FileLockService') > it('should return 409 when file is already locked')."
+    - "Minimum code coverage target: 80% for services, 70% for controllers, 60% for utilities."
+
+  tools:
+    nodejs: "Vitest + Supertest (integration)"
+    golang: "Standard testing package + testify"
+    e2e: "Playwright (critical user flows only)"
+
+
+# ------------------------------------------------------------
+# SECTION 9: INFRASTRUCTURE & DEVOPS RULES
+# ------------------------------------------------------------
+
+infrastructure:
+
+  docker:
+    - "Every service MUST have a multi-stage Dockerfile: build stage + minimal production stage."
+    - "Production Docker images MUST use non-root users."
+    - "NEVER include .env files, node_modules, or secrets in Docker images."
+    - "Each service's Dockerfile lives in infrastructure/docker/{service-name}.Dockerfile."
+    - "docker-compose.yml at root orchestrates ALL services for local development."
+
+  environment:
+    - "Use three environments: development, staging, production."
+    - "NEVER use production credentials in development or staging."
+    - "All secrets MUST be injected via environment variables — never committed to the repo."
+    - "Use a .env.example file in every service documenting required variables."
+    - "Production secrets are managed via a secrets manager (AWS Secrets Manager / Vault)."
+
+  ci_cd:
+    - "All PRs MUST pass: lint, type-check, unit tests, and build before merge."
+    - "Integration tests run on merge to main branch only."
+    - "Docker images are built and pushed to container registry on every merge to main."
+    - "Deployments to staging are automatic on merge to main."
+    - "Deployments to production require a manual approval step."
+
+  observability:
+    - "Every service MUST emit structured JSON logs (never plain text logs in production)."
+    - "Log levels: error (system failures), warn (unexpected but recoverable), info (key business events), debug (dev only)."
+    - "Every inbound HTTP request MUST be logged with: method, path, statusCode, durationMs, userId."
+    - "Every service MUST expose a GET /health endpoint returning { status: 'ok', uptime: number }."
+    - "Distributed tracing: every request MUST carry a X-Correlation-ID header, propagated across all service calls."
+
+
+# ------------------------------------------------------------
+# SECTION 10: GIT & COLLABORATION RULES
+# ------------------------------------------------------------
+
+git:
+  branch_strategy: "GitHub Flow (feature branches off main)"
+
+  branch_naming:
+    - "feat/{ticket-id}-short-description   → New features"
+    - "fix/{ticket-id}-short-description    → Bug fixes"
+    - "chore/{description}                  → Tooling, config, deps"
+    - "docs/{description}                   → Documentation only"
+    - "refactor/{description}               → Code restructuring, no behavior change"
+
+  commit_messages:
+    format: "Conventional Commits"
+    examples:
+      - "feat(file-service): add Redis-based file lock acquisition"
+      - "fix(auth-service): resolve JWT expiry edge case on refresh"
+      - "chore(deps): upgrade Prisma to v5.10"
+      - "docs(api): add OpenAPI spec for workspace endpoints"
+    rules:
+      - "Commits MUST follow the format: type(scope): description"
+      - "Subject line MUST be imperative mood, max 72 characters."
+      - "NEVER commit directly to main. All changes go through pull requests."
+      - "NEVER commit secrets, .env files, or credentials under any circumstance."
+
+  pull_requests:
+    - "Every PR MUST reference a ticket/issue."
+    - "PRs MUST include a description of changes and testing steps."
+    - "Minimum 1 reviewer approval required before merge."
+    - "Squash merge to keep main history clean."
+
+
+# ------------------------------------------------------------
+# SECTION 11: GENERAL AI ASSISTANCE RULES (CURSOR-SPECIFIC)
+# ------------------------------------------------------------
+
+ai_assistance:
+  rules:
+    - "When generating a new service file, always follow the project_layout defined in this rules file."
+    - "When generating API endpoints, always apply the uniform response envelope: { data, error, meta }."
+    - "When generating database queries, always go through the Repository layer — never inline."
+    - "When generating tests, mock all external dependencies in unit tests."
+    - "When generating Docker-related files, always use multi-stage builds with non-root users."
+    - "When generating environment config, always use Zod validation in a config/ file."
+    - "When asked to 'add a feature', first ask: which service owns this? Then implement in the correct service only."
+    - "When generating Go code, always use context.Context as first param for I/O functions."
+    - "When generating file locking code, always use Redis SET NX for atomic acquisition."
+    - "When generating RBAC checks, always use the AuthorizationService — never inline role checks."
+    - "Never generate code that stores JWTs in localStorage."
+    - "Never generate code that exposes raw DB errors to API responses."
+    - "Never generate code that executes user code outside a sandboxed container."
+    - "Always generate .env.example updates when adding new environment variables."
+    - "Always generate JSDoc/GoDoc comments for every exported symbol."

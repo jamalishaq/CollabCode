@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workspace-service
+  namespace: collabcode
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workspace-service
+  template:
+    metadata:
+      labels:
+        app: workspace-service
+    spec:
+      containers:
+        - name: workspace-service
+          image: collabcode/workspace-service:latest
+          ports:
+            - containerPort: 3002
