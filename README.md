@@ -233,4 +233,5 @@ Major technical decisions are documented in `docs/adr/`:
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE) for details.t e s t  
+ 
