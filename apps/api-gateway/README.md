@@ -10,5 +10,5 @@ and forwards traffic to downstream services.
 ## Setup
 
 1. Copy `.env.example` to `.env` and update values.
-2. Install dependencies with `npm install`.
-3. Start in dev mode with `npm run dev`.
+2. Install dependencies with `pnpm install`.
+3. Start in dev mode with `pnpm run dev`.

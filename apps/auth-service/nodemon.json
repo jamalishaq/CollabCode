@@ -1,0 +1,14 @@
+{
+    "watch": [
+      "/app/apps/auth-service/src",
+      "/app/packages/shared-types/src",
+      "/app/packages/shared-utils/src",
+      "/app/packages/shared-config/src"
+    ],
+    "ext": "ts,json",
+    "ignore": ["**/dist/**", "**/node_modules/**", "**/*.test.ts"],
+    "exec": "ts-node --project /app/apps/auth-service/tsconfig.json /app/apps/auth-service/src/index.ts",
+    "env": {
+      "NODE_ENV": "development"
+    }
+  }

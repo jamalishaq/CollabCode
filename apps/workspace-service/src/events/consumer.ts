@@ -1,9 +1,9 @@
-import { Kafka, type Consumer } from 'kafkajs';
+import { Receiver } from '@upstash/qstash';
 
 import { config } from '../config';
 
-/** Shared Kafka consumer for inbound events. */
-export const consumer: Consumer = new Kafka({
-  clientId: 'workspace-service',
-  brokers: config.KAFKA_BROKERS.split(',')
-}).consumer({ groupId: 'workspace-service-group' });
+/** Shared QStash consumer for inbound events. */
+export const consumer: Receiver = new Receiver({
+  currentSigningKey: config.QSTASH_CURRENT_SIGNING_KEY,
+  nextSigningKey: config.QSTASH_NEXT_SIGNING_KEY,
+})

@@ -25,7 +25,7 @@ Whether you are pair programming, conducting a technical interview, running a wo
 
 ## Architecture Overview
 
-CollabCode is built as a **microservices monorepo** using Turborepo. Each service is independently deployable and communicates over REST (synchronous) and Kafka (asynchronous).
+CollabCode is built as a **microservices monorepo** using Turborepo. Each service is independently deployable and communicates over REST (synchronous) and QStash (asynchronous).
 
 ```
 apps/
@@ -36,7 +36,7 @@ apps/
 ├── file-service/             # File CRUD, locking (Redis), version history
 ├── collaboration-service/    # WebSocket server, real-time CRDT sync (Go)
 ├── execution-service/        # Sandboxed code execution via Docker (Go)
-└── notification-service/     # Event-driven notifications (Kafka consumer)
+└── notification-service/     # Event-driven notifications (QStash consumer)
 
 packages/
 ├── shared-types/             # TypeScript interfaces shared across all services
@@ -54,7 +54,7 @@ packages/
 | Primary Database | PostgreSQL | Relational data, RBAC, strong consistency |
 | Cache & Locks | Redis | Atomic file lock acquisition (SET NX), presence, sessions |
 | File Storage | S3-compatible Object Storage | Versioned file content blobs |
-| Async Messaging | Kafka | Decoupled event-driven notifications |
+| Async Messaging | QStash | Decoupled event-driven notifications |
 | Real-Time Sync | Yjs (CRDT) | Conflict-free collaborative editing |
 | Code Execution | Docker (gVisor) | Isolated, resource-limited sandboxes |
 
@@ -101,7 +101,7 @@ cp apps/file-service/.env.example apps/file-service/.env
 docker-compose up
 ```
 
-This starts PostgreSQL, Redis, Kafka, and all application services. The frontend is available at `http://localhost:5173`.
+This starts PostgreSQL, Redis, and all application services. The frontend is available at `http://localhost:5173`.
 
 **5. Run database migrations**
 

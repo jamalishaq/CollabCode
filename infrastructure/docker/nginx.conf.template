@@ -1,0 +1,29 @@
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Gzip compression for faster asset delivery
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+    # Cache static assets aggressively (Vite adds content hashes to filenames)
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # SPA fallback — all unmatched routes serve index.html
+    # React Router handles the actual routing client-side
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Health check endpoint for Render / load balancers
+    location /health {
+        access_log off;
+        return 200 '{"status":"ok"}';
+        add_header Content-Type application/json;
+    }
+}

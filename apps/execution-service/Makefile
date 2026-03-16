@@ -1,3 +1,6 @@
+dev:
+	air
+	
 build:
 	go build ./...
 

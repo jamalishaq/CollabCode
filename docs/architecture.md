@@ -7,4 +7,5 @@ Primary flows:
 - Workspace/file CRUD: frontend -> api-gateway -> workspace-service/file-service
 - Realtime: frontend websocket -> collaboration-service
 - Execution: frontend -> execution-service
-Data stores: PostgreSQL, Redis, Kafka.
+Data stores: PostgreSQL, Redis.
+Messaging Queue: QStash

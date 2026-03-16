@@ -3,17 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npx tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -w -p tsconfig.json",
     "test": "echo \"No tests yet\"",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@collabcode/shared-types": "1.0.0",
+    "@collabcode/shared-types": "workspace:*",
     "pino": "^9.9.5"
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.1.3"
   }
 }

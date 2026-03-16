@@ -3,9 +3,18 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "declaration": true
+    "typeRoots": [
+      "../../node_modules/@types",
+      "./node_modules/@types"
+    ],
+    "paths": {
+      "@collabcode/shared-types": ["../shared-types/src/index.ts"]
+    }
   },
+  "references": [
+    { "path": "../shared-types" }
+  ],
   "include": [
-    "src"
+    "src/**/*"
   ]
 }

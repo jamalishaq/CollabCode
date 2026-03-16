@@ -7,7 +7,10 @@ type Config struct {
 	Port                  string
 	AppEnv                string
 	RedisAddr             string
-	KafkaBrokers          string
+	QStashBrokers          string
+	QStashUsername          string
+	QStashPassword          string
+	QStashSSL               bool
 	MaxExecutionTimeoutMs string
 }
 
@@ -17,7 +20,10 @@ func Load() Config {
 		Port:                  getEnv("PORT", "4001"),
 		AppEnv:                getEnv("APP_ENV", "development"),
 		RedisAddr:             getEnv("REDIS_ADDR", "localhost:6379"),
-		KafkaBrokers:          getEnv("KAFKA_BROKERS", "localhost:9092"),
+		QStashBrokers:          getEnv("QSTASH_BROKERS", "localhost:9092"),
+		QStashUsername:          getEnv("QSTASH_USERNAME", ""),
+		QStashPassword:          getEnv("QSTASH_PASSWORD", ""),
+		QStashSSL:               getEnv("QSTASH_SSL", "false") == "true",
 		MaxExecutionTimeoutMs: getEnv("MAX_EXECUTION_TIMEOUT_MS", "10000"),
 	}
 }

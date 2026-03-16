@@ -3,13 +3,23 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npx tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -w -p tsconfig.json",
     "test": "echo \"No tests yet\"",
     "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

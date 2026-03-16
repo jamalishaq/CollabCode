@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-npm run test
+pnpm run test

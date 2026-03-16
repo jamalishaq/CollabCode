@@ -1,193 +1,204 @@
+networks:
+  collabcode:
+    driver: bridge
+
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: collabcode-postgres
-    environment:
-      POSTGRES_DB: collabcode
-      POSTGRES_USER: collabcode
-      POSTGRES_PASSWORD: collabcode
-    ports:
-      - '5432:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7-alpine
-    container_name: collabcode-redis
-    ports:
-      - '6379:6379'
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.1
-    container_name: collabcode-zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - '2181:2181'
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.1
-    container_name: collabcode-kafka
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-    ports:
-      - '9092:29092'
-
-  api-gateway:
-    build:
-      context: .
-      dockerfile: infrastructure/docker/api-gateway.Dockerfile
-    container_name: collabcode-api-gateway
-    depends_on:
-      - auth-service
-      - workspace-service
-      - file-service
-      - notification-service
-      - postgres
-      - redis
-      - kafka
-    environment:
-      NODE_ENV: development
-      PORT: 3000
-      JWT_SECRET: super-secret
-      AUTH_SERVICE_URL: http://auth-service:3001
-      WORKSPACE_SERVICE_URL: http://workspace-service:3002
-      FILE_SERVICE_URL: http://file-service:3003
-      NOTIFICATION_SERVICE_URL: http://notification-service:3004
-      KAFKA_BROKERS: kafka:9092
-      REDIS_URL: redis://redis:6379
-    ports:
-      - '3000:3000'
-
+  # ── Auth Service ────────────────────────────────────────────────
   auth-service:
     build:
       context: .
       dockerfile: infrastructure/docker/auth-service.Dockerfile
     container_name: collabcode-auth-service
-    depends_on:
-      - postgres
-      - redis
-      - kafka
+    networks:
+      - collabcode
+    env_file:
+      - ./apps/auth-service/.env
     environment:
-      NODE_ENV: development
-      PORT: 3001
-      DATABASE_URL: postgresql://collabcode:collabcode@postgres:5432/collabcode
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: super-secret
-      KAFKA_BROKERS: kafka:9092
+      PORT: "3001"
     ports:
-      - '3001:3001'
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
+  # ── Workspace Service ───────────────────────────────────────────
   workspace-service:
     build:
       context: .
       dockerfile: infrastructure/docker/workspace-service.Dockerfile
     container_name: collabcode-workspace-service
-    depends_on:
-      - postgres
-      - redis
-      - kafka
+    networks:
+      - collabcode
+    env_file:
+      - ./apps/workspace-service/.env
     environment:
-      NODE_ENV: development
-      PORT: 3002
-      DATABASE_URL: postgresql://collabcode:collabcode@postgres:5432/collabcode
-      REDIS_URL: redis://redis:6379
-      KAFKA_BROKERS: kafka:9092
+      PORT: "3002"
     ports:
-      - '3002:3002'
+      - "3002:3002"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
+  # ── File Service ────────────────────────────────────────────────
   file-service:
     build:
       context: .
       dockerfile: infrastructure/docker/file-service.Dockerfile
     container_name: collabcode-file-service
-    depends_on:
-      - postgres
-      - redis
-      - kafka
+    networks:
+      - collabcode
+    env_file:
+      - ./apps/file-service/.env
     environment:
-      NODE_ENV: development
-      PORT: 3003
-      DATABASE_URL: postgresql://collabcode:collabcode@postgres:5432/collabcode
-      REDIS_URL: redis://redis:6379
-      KAFKA_BROKERS: kafka:9092
-      LOCK_TTL_SECONDS: 30
+      PORT: "3003"
     ports:
-      - '3003:3003'
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3003/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
+  # ── Notification Service ────────────────────────────────────────
   notification-service:
     build:
       context: .
       dockerfile: infrastructure/docker/notification-service.Dockerfile
     container_name: collabcode-notification-service
-    depends_on:
-      - kafka
-      - redis
+    networks:
+      - collabcode
+    env_file:
+      - ./apps/notification-service/.env
     environment:
-      NODE_ENV: development
-      PORT: 3004
-      REDIS_URL: redis://redis:6379
-      KAFKA_BROKERS: kafka:9092
+      PORT: "3004"
     ports:
-      - '3004:3004'
+      - "3004:3004"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3004/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
+  # ── Collaboration Service (Go) ──────────────────────────────────
   collaboration-service:
     build:
       context: .
       dockerfile: infrastructure/docker/collaboration-service.Dockerfile
     container_name: collabcode-collaboration-service
-    depends_on:
-      - redis
-      - kafka
+    networks:
+      - collabcode
+    env_file:
+      - ./apps/collaboration-service/.env
     environment:
-      APP_ENV: development
-      PORT: 4000
-      REDIS_ADDR: redis:6379
-      KAFKA_BROKERS: kafka:9092
+      PORT: "4000"
     ports:
-      - '4000:4000'
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
+  # ── Execution Service (Go) ──────────────────────────────────────
+  # CRITICAL: Requires access to the host Docker socket to spawn
+  # sandboxed containers for user code execution.
+  # The socket is mounted read-write — this is intentional and required.
   execution-service:
     build:
       context: .
       dockerfile: infrastructure/docker/execution-service.Dockerfile
     container_name: collabcode-execution-service
-    depends_on:
-      - redis
-      - kafka
+    networks:
+      - collabcode
+    env_file:
+      - ./apps/execution-service/.env
     environment:
-      APP_ENV: development
-      PORT: 4001
-      REDIS_ADDR: redis:6379
-      KAFKA_BROKERS: kafka:9092
-      MAX_EXECUTION_TIMEOUT_MS: 10000
+      PORT: "4001"
     ports:
-      - '4001:4001'
+      - "4001:4001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
+  # ── API Gateway ─────────────────────────────────────────────────
+  # Deployed LAST — depends on all downstream services being healthy.
+  # Uses internal Docker network hostnames for service-to-service calls.
+  api-gateway:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api-gateway.Dockerfile
+    container_name: collabcode-api-gateway
+    networks:
+      - collabcode
+    env_file:
+      - ./apps/api-gateway/.env
+    environment:
+      PORT: "3000"
+      # Override service URLs to use Docker internal hostnames
+      # These override whatever is in the .env file for local dev
+      AUTH_SERVICE_URL: http://auth-service:3001
+      WORKSPACE_SERVICE_URL: http://workspace-service:3002
+      FILE_SERVICE_URL: http://file-service:3003
+      NOTIFICATION_SERVICE_URL: http://notification-service:3004
+      COLLABORATION_SERVICE_URL: ws://collaboration-service:4000
+      EXECUTION_SERVICE_URL: http://execution-service:4001
+    ports:
+      - "3000:3000"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      workspace-service:
+        condition: service_healthy
+      file-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      collaboration-service:
+        condition: service_healthy
+      execution-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Frontend ────────────────────────────────────────────────────
+  # VITE_ variables must be passed as build args — they are embedded
+  # into the JS bundle at build time, not injected at runtime.
+  # Port mapping: host 5173 → container 80 (Nginx listens on PORT=80)
   frontend:
     build:
       context: .
       dockerfile: infrastructure/docker/frontend.Dockerfile
+      args:
+        VITE_API_URL: http://127.0.0.1:3000
+        VITE_WS_URL: ws://127.0.0.1:4000
     container_name: collabcode-frontend
-    depends_on:
-      - api-gateway
-      - collaboration-service
-      - execution-service
+    networks:
+      - collabcode
     environment:
-      VITE_API_BASE_URL: http://localhost:3000
-      VITE_COLLAB_WS_URL: ws://localhost:4000
-      VITE_EXECUTION_API_URL: http://localhost:4001
+      PORT: "80"
     ports:
-      - '5173:5173'
-
-volumes:
-  postgres_data:
+      - "5173:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      collaboration-service:
+        condition: service_healthy

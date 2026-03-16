@@ -1,0 +1,155 @@
+services:
+
+  # ── Collaboration Service ────────────────────────────────────────────────
+  collaboration-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/collaboration-service.Dockerfile
+      target: builder
+    command: air
+    volumes:
+      - ./apps/collaboration-service:/app
+      - /app/tmp
+    healthcheck:
+      disable: true
+
+  # ── Execution Service ───────────────────────────────────────────
+  execution-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/execution-service.Dockerfile
+      target: builder
+    command: air
+    volumes:
+      - ./apps/execution-service:/app
+      - /app/tmp
+    healthcheck:
+      disable: true
+
+  # ── Auth Service ────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/auth-service.Dockerfile
+      target: deps        
+    command: pnpm --filter auth-service dev
+    volumes:
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./apps/auth-service:/app/apps/auth-service
+      - ./packages/shared-types:/app/packages/shared-types
+      - ./packages/shared-utils:/app/packages/shared-utils
+      - ./packages/shared-config:/app/packages/shared-config
+    environment:
+      NODE_ENV: development
+    healthcheck:
+      disable: true
+
+  # ── Workspace Service ───────────────────────────────────────────
+  workspace-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/workspace-service.Dockerfile
+      target: deps
+    command: pnpm --filter workspace-service dev
+    volumes:
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./apps/workspace-service:/app/apps/workspace-service
+      - ./packages/shared-types:/app/packages/shared-types
+      - ./packages/shared-utils:/app/packages/shared-utils
+      - ./packages/shared-config:/app/packages/shared-config
+    environment:
+      NODE_ENV: development
+    healthcheck:
+      disable: true
+
+  # ── File Service ────────────────────────────────────────────────
+  file-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/file-service.Dockerfile
+      target: deps
+    command: pnpm --filter file-service dev
+    volumes:
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./apps/file-service:/app/apps/file-service
+      - ./packages/shared-types:/app/packages/shared-types
+      - ./packages/shared-utils:/app/packages/shared-utils
+      - ./packages/shared-config:/app/packages/shared-config
+    environment:
+      NODE_ENV: development
+    healthcheck:
+      disable: true
+      
+  # ── Notification Service ────────────────────────────────────────
+  notification-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/notification-service.Dockerfile
+      target: deps
+    command: pnpm --filter notification-service dev
+    volumes:
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./apps/notification-service:/app/apps/notification-service
+      - ./packages/shared-types:/app/packages/shared-types
+      - ./packages/shared-utils:/app/packages/shared-utils
+      - ./packages/shared-config:/app/packages/shared-config
+    environment:
+      NODE_ENV: development
+    healthcheck:
+      disable: true
+      
+  # ── API Gateway ────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api-gateway.Dockerfile
+      target: deps
+    command: pnpm --filter api-gateway dev
+    volumes:
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./apps/api-gateway:/app/apps/api-gateway
+      - ./packages/shared-types:/app/packages/shared-types
+      - ./packages/shared-utils:/app/packages/shared-utils
+      - ./packages/shared-config:/app/packages/shared-config
+    environment:
+      NODE_ENV: development
+    healthcheck:
+      disable: true
+    depends_on:
+      auth-service:
+        condition: service_started
+      workspace-service:
+        condition: service_started
+      file-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+      collaboration-service:
+        condition: service_started
+      execution-service:
+        condition: service_started
+
+  # ── Frontend ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/frontend.Dockerfile
+      target: dev
+    command: pnpm --filter frontend dev
+    volumes:
+      - ./apps/frontend:/app/apps/frontend
+      - ./packages/shared-types:/app/packages/shared-types
+      - ./packages/shared-utils:/app/packages/shared-utils
+      - ./packages/shared-config:/app/packages/shared-config
+    ports:
+      - "5173:5173"
+    environment:
+      NODE_ENV: development
+      NODE_PATH: /app/node_modules
+      VITE_API_URL: http://localhost:3000
+      VITE_WS_URL: ws://localhost:4000
+    depends_on:
+      api-gateway:
+        condition: service_started
+      collaboration-service:
+        condition: service_started

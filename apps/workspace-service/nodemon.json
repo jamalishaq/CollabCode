@@ -1,0 +1,14 @@
+{
+    "watch": [
+      "/app/apps/workspace-service/src",
+      "/app/packages/shared-types/src",
+      "/app/packages/shared-utils/src",
+      "/app/packages/shared-config/src"
+    ],
+    "ext": "ts,json",
+    "ignore": ["**/dist/**", "**/node_modules/**", "**/*.test.ts"],
+    "exec": "ts-node --project /app/apps/workspace-service/tsconfig.json /app/apps/workspace-service/src/index.ts",
+    "env": {
+      "NODE_ENV": "development"
+    }
+  }
