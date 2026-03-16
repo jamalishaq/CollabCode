@@ -5,15 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "/app/node_modules/.bin/vite --host 0.0.0.0",
-    "build": "tsc && /app/node_modules/.bin/vite build",
+    "build": "tsc && pnpm exec vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "echo \"No unit tests yet\"",
+    "test:integration": "echo \"No integration tests yet\"",
+    "test:smoke": "echo \"No smoke tests yet\""
   },
   "dependencies": {
     "@collabcode/shared-types": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.90.21",
     "axios": "^1.13.6",
+    "monaco-editor": "^0.55.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "socket.io-client": "^4.8.3",
