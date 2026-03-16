@@ -46,17 +46,19 @@ packages/
 
 **Key technology decisions:**
 
-| Layer | Technology | Reason |
-|---|---|---|
-| Frontend | React + TypeScript + Monaco Editor | Rich editor UI, type safety |
-| Node.js Services | TypeScript + Fastify + Prisma | I/O-bound, shared types with frontend |
-| Collaboration & Execution | Go | High concurrency, low-latency WebSockets, container control |
-| Primary Database | PostgreSQL | Relational data, RBAC, strong consistency |
-| Cache & Locks | Redis | Atomic file lock acquisition (SET NX), presence, sessions |
-| File Storage | S3-compatible Object Storage | Versioned file content blobs |
-| Async Messaging | QStash | Decoupled event-driven notifications |
-| Real-Time Sync | Yjs (CRDT) | Conflict-free collaborative editing |
-| Code Execution | Docker (gVisor) | Isolated, resource-limited sandboxes |
+
+| Layer                     | Technology                         | Reason                                                      |
+| ------------------------- | ---------------------------------- | ----------------------------------------------------------- |
+| Frontend                  | React + TypeScript + Monaco Editor | Rich editor UI, type safety                                 |
+| Node.js Services          | TypeScript + Fastify + Prisma      | I/O-bound, shared types with frontend                       |
+| Collaboration & Execution | Go                                 | High concurrency, low-latency WebSockets, container control |
+| Primary Database          | PostgreSQL                         | Relational data, RBAC, strong consistency                   |
+| Cache & Locks             | Redis                              | Atomic file lock acquisition (SET NX), presence, sessions   |
+| File Storage              | S3-compatible Object Storage       | Versioned file content blobs                                |
+| Async Messaging           | QStash                             | Decoupled event-driven notifications                        |
+| Real-Time Sync            | Yjs (CRDT)                         | Conflict-free collaborative editing                         |
+| Code Execution            | Docker (gVisor)                    | Isolated, resource-limited sandboxes                        |
+
 
 ---
 
@@ -132,16 +134,18 @@ pnpm --filter frontend test:e2e
 
 Every service exposes a health endpoint:
 
-| Service | Port | Health URL |
-|---|---|---|
-| API Gateway | 3000 | http://localhost:3000/health |
-| Auth Service | 3001 | http://localhost:3001/health |
-| Workspace Service | 3002 | http://localhost:3002/health |
-| File Service | 3003 | http://localhost:3003/health |
-| Notification Service | 3004 | http://localhost:3004/health |
-| Collaboration Service | 4000 | http://localhost:4000/health |
-| Execution Service | 4001 | http://localhost:4001/health |
-| Frontend | 5173 | http://localhost:5173 |
+
+| Service               | Port | Health URL                                                   |
+| --------------------- | ---- | ------------------------------------------------------------ |
+| API Gateway           | 3000 | [http://localhost:3000/health](http://localhost:3000/health) |
+| Auth Service          | 3001 | [http://localhost:3001/health](http://localhost:3001/health) |
+| Workspace Service     | 3002 | [http://localhost:3002/health](http://localhost:3002/health) |
+| File Service          | 3003 | [http://localhost:3003/health](http://localhost:3003/health) |
+| Notification Service  | 3004 | [http://localhost:3004/health](http://localhost:3004/health) |
+| Collaboration Service | 4000 | [http://localhost:4000/health](http://localhost:4000/health) |
+| Execution Service     | 4001 | [http://localhost:4001/health](http://localhost:4001/health) |
+| Frontend              | 5173 | [http://localhost:5173](http://localhost:5173)               |
+
 
 ---
 
@@ -172,10 +176,10 @@ collabcode/
 
 OpenAPI specs for each service are maintained in `docs/api-contracts/`. When running locally, each service also serves interactive Swagger docs:
 
-- Auth Service: http://localhost:3001/docs
-- Workspace Service: http://localhost:3002/docs
-- File Service: http://localhost:3003/docs
-- Execution Service: http://localhost:4001/docs
+- Auth Service: [http://localhost:3001/docs](http://localhost:3001/docs)
+- Workspace Service: [http://localhost:3002/docs](http://localhost:3002/docs)
+- File Service: [http://localhost:3003/docs](http://localhost:3003/docs)
+- Execution Service: [http://localhost:4001/docs](http://localhost:4001/docs)
 
 ---
 
@@ -203,6 +207,7 @@ All user input is validated against strict **Zod schemas** before reaching busin
 Contributions are welcome. Please read the guidelines before submitting a pull request.
 
 **Branch naming:**
+
 ```
 feat/{ticket-id}-short-description
 fix/{ticket-id}-short-description
@@ -211,6 +216,7 @@ docs/{description}
 ```
 
 **Commit format** (Conventional Commits):
+
 ```
 feat(file-service): add Redis-based file lock acquisition
 fix(auth-service): resolve JWT expiry edge case on refresh
@@ -233,5 +239,4 @@ Major technical decisions are documented in `docs/adr/`:
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.t e s t  
- 
+MIT License. See [LICENSE](LICENSE) for details.
