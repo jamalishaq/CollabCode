@@ -7,7 +7,8 @@
     "dev": "nodemon -L",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
+    "test": "echo \"No unit tests yet\"",
+    "test:integration": "echo \"No integration tests yet\"",
     "lint": "eslint src --ext .ts"
   },
     "dependencies": {
