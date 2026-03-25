@@ -25,6 +25,12 @@ jobs:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           api_key: ${{ secrets.NEON_API_KEY }}
           branch_name: pr-${{ github.event.pull_request.number }}
+      - name: Debug Neon outputs
+        if: github.event.action != 'closed'
+        run: |
+          echo "branch_id set? ${{ steps.create-branch.outputs.branch_id != '' }}"
+          echo "db_url set? ${{ steps.create-branch.outputs.db_url != '' }}"
+          echo "db_host set? ${{ steps.create-branch.outputs.db_host != '' }}"
 
       - name: Delete Neon DB branch on PR close
         if: github.event.action == 'closed'
@@ -56,6 +62,17 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Debug DATABASE_URL presence
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL is empty"
+            exit 1
+          else
+            echo "DATABASE_URL is present"
+          fi
+        env:
+          DATABASE_URL: ${{ needs.neon-branch.outputs.db_url }}
 
       - name: Run Prisma migrations on Neon branch
         run: pnpm turbo run db:migrate
