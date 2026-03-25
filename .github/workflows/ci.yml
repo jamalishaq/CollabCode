@@ -20,7 +20,7 @@ jobs:
       - name: Create Neon DB branch for PR
         id: create-branch
         if: github.event.action != 'closed'
-        uses: neondatabase/create-branch-action@v5
+        uses: neondatabase/create-branch-action@v6
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           api_key: ${{ secrets.NEON_API_KEY }}
@@ -39,6 +39,7 @@ jobs:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           api_key: ${{ secrets.NEON_API_KEY }}
           branch: pr-${{ github.event.pull_request.number }}
+          prisma: true
 
   # ── Run Prisma Migrations on Neon Branch ──────────────────────────
   # Only runs when PR is opened/updated (not on close).
@@ -74,8 +75,13 @@ jobs:
         env:
           DATABASE_URL: ${{ needs.neon-branch.outputs.db_url }}
 
-      - name: Run Prisma migrations on Neon branch
-        run: pnpm turbo run db:migrate
+      - name: Run workspace-service migrations
+        run: pnpm --filter @collabcode/workspace-service run db:migrate
+        env:
+          DATABASE_URL: ${{ needs.neon-branch.outputs.db_url }}
+  
+      - name: Run file-service migrations
+        run: pnpm --filter @collabcode/file-service run db:migrate
         env:
           DATABASE_URL: ${{ needs.neon-branch.outputs.db_url }}
 
