@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+
+  # ── Neon DB Branch Management ─────────────────────────────────────
+  # Creates an isolated Neon DB branch when a PR is opened or updated.
+  # Deletes the branch automatically when the PR is closed.
+  # The branch URL is passed to the migration job via job outputs.
+  neon-preview:
+    name: Create Neon branch and run migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Create Neon DB branch for PR
+        id: create-branch
+        if: github.event.action != 'closed'
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: pr-${{ github.event.pull_request.number }}
+          prisma: true
+
+      - name: Run workspace-service migrations
+        if: github.event.action != 'closed'
+        run: pnpm --filter @collabcode/workspace-service run db:migrate
+        env:
+          DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
+
+      - name: Run file-service migrations
+        if: github.event.action != 'closed'
+        run: pnpm --filter @collabcode/file-service run db:migrate
+        env:
+          DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
+
+      - name: Delete Neon DB branch on PR close
+        if: github.event.action == 'closed'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: pr-${{ github.event.pull_request.number }}
+
+  # ── Lint & Type Check (Node.js services + frontend) ───────────────
+  # Runs across all Node.js services and frontend in parallel via
+  # Turborepo. Only re-runs for services affected by PR changes.
+  lint-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint & type check all services
+        run: pnpm turbo run lint typecheck
+
+  # ── Unit Tests (Node.js services + frontend) ──────────────────────
+  # External dependencies (Redis, DB, Kafka) are mocked in unit tests.
+  # No infrastructure services are needed here.
+  unit-tests-node:
+    name: Unit Tests (Node.js)
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run unit tests
+        run: pnpm turbo run test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-node
+          path: '**/coverage/'
+
+  # ── Go Build & Unit Tests ─────────────────────────────────────────
+  # Runs in parallel for each Go service via matrix strategy.
+  # -race flag detects data races in concurrent Go code.
+  unit-tests-go:
+    name: Unit Tests (Go) — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    strategy:
+      matrix:
+        service: [collaboration-service, execution-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: apps/${{ matrix.service }}/go.sum
+
+      - name: Build and test ${{ matrix.service }}
+        run: |
+          cd apps/${{ matrix.service }}
+          go build ./...
+          go test ./... -race -coverprofile=coverage.out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-go-${{ matrix.service }}
+          path: apps/${{ matrix.service }}/coverage.out
+
+  # ── CI Gate ───────────────────────────────────────────────────────
+  # Single job that depends on all check jobs.
+  # Branch protection rules only need to require this one job —
+  # it passes only when every check above passes.
+  ci-pass:
+    name: CI Pass
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    needs:
+      - neon-preview
+      - lint-typecheck
+      - unit-tests-node
+      - unit-tests-go
+    steps:
+      - run: echo "All CI checks passed."
