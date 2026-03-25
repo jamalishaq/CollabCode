@@ -28,13 +28,7 @@ module.exports = [
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
-      "sort-imports": [
-        "error",
-        {
-          ignoreCase: true,
-          ignoreDeclarationSort: false
-        }
-      ],
+      "sort-imports": "off",
       "no-duplicate-imports": "error",
       "@typescript-eslint/no-explicit-any": "error"
     }
