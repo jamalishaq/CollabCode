@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "echo \"No unit tests yet\"",
     "test:integration": "echo \"No integration tests yet\"",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
     "@collabcode/shared-types": "workspace:*",

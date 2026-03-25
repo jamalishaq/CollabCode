@@ -33,6 +33,10 @@
         "^build"
       ],
       "outputs": []
+    },
+    "db:migrate": {
+      "cache": false,
+      "env": ["DATABASE_URL"]
     }
   }
 }
