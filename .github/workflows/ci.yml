@@ -150,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
     needs:
-      - db-migrate
+      - neon-preview
       - lint-typecheck
       - unit-tests-node
       - unit-tests-go
