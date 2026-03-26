@@ -19,7 +19,13 @@ export async function findRefreshToken(token: string): Promise<{
 } | null> {
   return prisma.refreshToken.findUnique({
     where: { token }
-  });
+  }) as Promise<{
+    id: string;
+    token: string;
+    userId: string;
+    expiresAt: Date;
+    revokedAt: Date | null;
+  } | null>;
 }
 
 export async function revokeRefreshToken(token: string): Promise<void> {

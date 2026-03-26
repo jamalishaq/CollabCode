@@ -14,14 +14,14 @@ export async function findUserByEmail(email: string): Promise<UserWithProfile | 
   return prisma.user.findUnique({
     where: { email },
     include: { profile: true }
-  });
+  }) as Promise<UserWithProfile | null>;
 }
 
 export async function findUserById(id: string): Promise<UserWithProfile | null> {
   return prisma.user.findUnique({
     where: { id },
     include: { profile: true }
-  });
+  }) as Promise<UserWithProfile | null>;
 }
 
 export async function createUser(params: {
@@ -40,5 +40,5 @@ export async function createUser(params: {
       }
     },
     include: { profile: true }
-  });
+  }) as Promise<UserWithProfile>;
 }
