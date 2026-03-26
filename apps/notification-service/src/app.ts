@@ -9,7 +9,15 @@ import { registerRoutes } from './routes';
  */
 export function createApp(): FastifyInstance {
   const app = Fastify({ logger: true });
+
+  app.addHook('onRequest', async (_request, reply) => {
+    reply.header('x-content-type-options', 'nosniff');
+    reply.header('x-frame-options', 'DENY');
+    reply.header('referrer-policy', 'no-referrer');
+  });
+
   app.setErrorHandler(errorMiddleware);
   void registerRoutes(app);
+
   return app;
 }
