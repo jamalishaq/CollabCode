@@ -10,7 +10,8 @@ import { registerRoutes } from './routes';
 export function createApp(): FastifyInstance {
   const app = Fastify({ logger: true, trustProxy: true });
 
-  app.addContentTypeParser(/^application\/json(?:;.*)?$/i, { parseAs: 'string' }, (request, body, done) => {
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
     const rawBody = body.toString();
     (request as { rawBody?: string }).rawBody = rawBody;
 
