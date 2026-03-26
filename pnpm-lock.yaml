@@ -204,9 +204,15 @@ importers:
 
   apps/frontend:
     dependencies:
+      '@collabcode/shared-config':
+        specifier: workspace:*
+        version: link:../../packages/shared-config
       '@collabcode/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
+      '@collabcode/shared-utils':
+        specifier: workspace:*
+        version: link:../../packages/shared-utils
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
