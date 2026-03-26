@@ -17,6 +17,39 @@ function resolveSignatureHeader(request: FastifyRequest): string | null {
   return candidate ?? null;
 }
 
+function resolveAbsoluteUrl(request: FastifyRequest): string {
+  const forwardedProto = request.headers['x-forwarded-proto'];
+  const forwardedHost = request.headers['x-forwarded-host'];
+
+  const protocol = Array.isArray(forwardedProto)
+    ? forwardedProto[0]
+    : forwardedProto ?? request.protocol ?? 'http';
+
+  const host = Array.isArray(forwardedHost)
+    ? forwardedHost[0]
+    : forwardedHost ?? request.headers.host;
+
+  if (!host) {
+    return request.url;
+  }
+
+  return `${protocol}://${host}${request.url}`;
+}
+
+function resolveRawBody(request: FastifyRequest): string {
+  const rawBody = (request as { rawBody?: string }).rawBody;
+
+  if (typeof rawBody === 'string') {
+    return rawBody;
+  }
+
+  if (typeof request.body === 'string') {
+    return request.body;
+  }
+
+  return JSON.stringify(request.body ?? {});
+}
+
 export const qstashMiddleware: preHandlerHookHandler = async (
   request: FastifyRequest,
   reply: FastifyReply
@@ -28,13 +61,11 @@ export const qstashMiddleware: preHandlerHookHandler = async (
     return;
   }
 
-  const body = typeof request.body === 'string' ? request.body : JSON.stringify(request.body ?? {});
-
   try {
     await (consumer as unknown as QstashReceiver).verify({
       signature,
-      body,
-      url: request.url
+      body: resolveRawBody(request),
+      url: resolveAbsoluteUrl(request)
     });
   } catch (error) {
     request.log.warn({ err: error }, 'QStash signature verification failed.');
