@@ -7,14 +7,8 @@
       "../../node_modules/@types",
       "./node_modules/@types"
     ],
-    "paths": {
-      "@collabcode/shared-types": ["../shared-types/src/index.ts"]
-    }
+    "composite": true
   },
-  "references": [
-    { "path": "../shared-types" }
-  ],
-  "include": [
-    "src/**/*"
-  ]
+  "references": [{ "path": "../shared-types" }],
+  "include": ["src/**/*"]
 }

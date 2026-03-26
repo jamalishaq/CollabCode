@@ -1,3 +1,4 @@
+import { failure } from '@collabcode/shared-utils';
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 
 import { AppError } from '../utils/app-error';
@@ -14,15 +15,9 @@ export function errorMiddleware(
   reply: FastifyReply
 ): void {
   if (error instanceof AppError) {
-    reply.status(error.statusCode).send({
-      data: null,
-      error: { code: 'APP_ERROR', message: error.message }
-    });
+    reply.status(error.statusCode).send(failure(error.code, error.message, error.details));
     return;
   }
 
-  reply.status(500).send({
-    data: null,
-    error: { code: 'INTERNAL_SERVER_ERROR', message: 'An unexpected error occurred.' }
-  });
+  reply.status(500).send(failure('INTERNAL_SERVER_ERROR', 'An unexpected error occurred.'));
 }

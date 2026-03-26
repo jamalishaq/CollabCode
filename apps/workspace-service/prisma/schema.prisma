@@ -17,6 +17,7 @@ model Workspace {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
   projects    Project[]
+  members     WorkspaceMember[]
 }
 
 model Project {
@@ -38,7 +39,9 @@ model WorkspaceMember {
   role        String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@unique([workspaceId, userId])
   @@index([workspaceId])
   @@index([userId])
 }
