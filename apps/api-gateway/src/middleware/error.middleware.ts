@@ -1,28 +1,26 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 
+import { failure } from '@collabcode/shared-utils';
+
 import { AppError } from '../utils/app-error';
 
-/**
- * Handles all uncaught route and middleware errors uniformly.
- * @param error Error thrown by application code.
- * @param _request Fastify request.
- * @param reply Fastify reply.
- */
 export function errorMiddleware(
   error: FastifyError | AppError,
   _request: FastifyRequest,
   reply: FastifyReply
 ): void {
   if (error instanceof AppError) {
-    reply.status(error.statusCode).send({
-      data: null,
-      error: { code: 'APP_ERROR', message: error.message }
+    const payload = failure(error.code, error.message, {
+      statusCode: error.statusCode,
+      ...(error.details !== undefined ? { ...((error.details as Record<string, unknown>) ?? {}) } : {})
     });
+    reply.status(error.statusCode).send(payload);
     return;
   }
 
-  reply.status(500).send({
-    data: null,
-    error: { code: 'INTERNAL_SERVER_ERROR', message: 'An unexpected error occurred.' }
-  });
+  reply.status(500).send(
+    failure('INTERNAL_SERVER_ERROR', 'An unexpected error occurred.', {
+      statusCode: 500
+    })
+  );
 }

@@ -1,15 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 
-/**
- * Registers health route handlers.
- * @param app Fastify instance.
- */
+import { HealthController } from '../controllers/health.controller';
+
 export async function healthRoute(app: FastifyInstance): Promise<void> {
-  app.get('/health', async () => ({
-    data: {
-      status: 'ok',
-      uptime: process.uptime()
-    },
-    error: null
-  }));
+  app.get('/health', HealthController.check);
 }
