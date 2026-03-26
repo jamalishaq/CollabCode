@@ -238,15 +238,19 @@ export async function acquireLock(projectId: string, fileId: string, userId: str
   if (result !== 'OK') {
     const currentLock = parseLock(await redis.get(lockKey(fileId)));
 
-    await publishLockConflict({
-      type: 'file.lock.conflict',
-      fileId,
-      fileName: file.name,
-      requestedBy: userId,
-      lockedBy: currentLock?.userId,
-      expiresAt: currentLock?.expiresAt,
-      timestamp: now.toISOString()
-    });
+    try {
+      await publishLockConflict({
+        type: 'file.lock.conflict',
+        fileId,
+        fileName: file.name,
+        requestedBy: userId,
+        lockedBy: currentLock?.userId,
+        expiresAt: currentLock?.expiresAt,
+        timestamp: now.toISOString()
+      });
+    } catch {
+      // Conflict responses should remain deterministic even if event publication fails.
+    }
 
     throw new AppError('File is locked by another user', 409, 'FILE_LOCKED', {
       lockedBy: currentLock?.userId,
@@ -286,24 +290,46 @@ export async function releaseLock(projectId: string, fileId: string, userId: str
 export async function renewLock(projectId: string, fileId: string, userId: string): Promise<string> {
   await findActiveFile(projectId, fileId);
 
-  const current = parseLock(await redis.get(lockKey(fileId)));
-  if (!current) {
+  const ttlSeconds = config.LOCK_TTL_SECONDS || DEFAULT_LOCK_TTL_SECONDS;
+  const renewScript = `
+    local value = redis.call('GET', KEYS[1])
+    if not value then
+      return cjson.encode({ status = 'NOT_FOUND' })
+    end
+
+    local obj = cjson.decode(value)
+    if obj.userId ~= ARGV[1] then
+      return cjson.encode({ status = 'NOT_OWNER' })
+    end
+
+    local acquiredAt = obj.acquiredAt
+    local expiresAt = ARGV[2]
+    local updated = cjson.encode({
+      fileId = obj.fileId,
+      userId = obj.userId,
+      acquiredAt = acquiredAt,
+      expiresAt = expiresAt
+    })
+
+    redis.call('SET', KEYS[1], updated, 'EX', tonumber(ARGV[3]))
+    return cjson.encode({ status = 'OK', expiresAt = expiresAt })
+  `;
+
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+  const raw = (await redis.eval(renewScript, 1, lockKey(fileId), userId, expiresAt, ttlSeconds)) as string;
+  const result = JSON.parse(raw) as { status: 'OK' | 'NOT_FOUND' | 'NOT_OWNER'; expiresAt?: string };
+
+  if (result.status === 'NOT_FOUND') {
     throw new AppError('No active lock found.', 404, 'LOCK_NOT_FOUND');
   }
 
-  if (current.userId !== userId) {
+  if (result.status === 'NOT_OWNER') {
     throw new AppError('Only the lock holder can renew the lock.', 403, 'LOCK_NOT_OWNER');
   }
 
-  const ttlSeconds = config.LOCK_TTL_SECONDS || DEFAULT_LOCK_TTL_SECONDS;
-  const renewedAt = new Date();
-  const renewedLock: SharedFileLock = {
-    fileId,
-    userId,
-    acquiredAt: current.acquiredAt,
-    expiresAt: new Date(renewedAt.getTime() + ttlSeconds * 1000).toISOString()
-  };
+  if (!result.expiresAt) {
+    throw new AppError('Lock renew failed.', 500, 'LOCK_RENEW_FAILED');
+  }
 
-  await redis.set(lockKey(fileId), JSON.stringify(renewedLock), 'EX', ttlSeconds);
-  return renewedLock.expiresAt;
+  return result.expiresAt;
 }
