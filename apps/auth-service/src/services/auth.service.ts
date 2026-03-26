@@ -4,7 +4,12 @@ import { randomUUID } from 'node:crypto';
 
 import { config } from '../config';
 import { AppError } from '../utils/app-error';
-import { createRefreshToken, findRefreshToken, revokeRefreshToken } from '../repositories/token.repository';
+import {
+  createRefreshToken,
+  findRefreshToken,
+  revokeRefreshToken,
+  rotateRefreshToken
+} from '../repositories/token.repository';
 import { createUser, findUserByEmail, findUserById, type UserWithProfile } from '../repositories/user.repository';
 import { prisma } from '../lib/prisma';
 
@@ -103,7 +108,7 @@ export async function loginUser(
 export async function refreshAccessToken(
   appJwt: JwtAdapter,
   refreshToken: string
-): Promise<{ accessToken: string }> {
+): Promise<SessionTokens> {
   const tokenRecord = await findRefreshToken(refreshToken);
   if (!tokenRecord || tokenRecord.revokedAt !== null || tokenRecord.expiresAt.getTime() <= Date.now()) {
     throw new AppError('Invalid refresh token.', 401);
@@ -120,7 +125,7 @@ export async function refreshAccessToken(
     throw new AppError('User no longer exists.', 404);
   }
 
-  const accessToken = appJwt.sign(
+  const replacementAccessToken = appJwt.sign(
     { email: user.email },
     {
       sub: user.id,
@@ -129,7 +134,35 @@ export async function refreshAccessToken(
     }
   );
 
-  return { accessToken };
+  const replacementRefreshToken = appJwt.sign(
+    { type: 'refresh', nonce: randomUUID() },
+    {
+      sub: user.id,
+      expiresIn: config.REFRESH_TOKEN_EXPIRY,
+      secret: config.REFRESH_TOKEN_SECRET,
+      issuer: 'collabcode-auth'
+    }
+  );
+
+  const replacementDecoded = appJwt.verify<{ exp: number }>(replacementRefreshToken, {
+    secret: config.REFRESH_TOKEN_SECRET
+  });
+
+  const rotated = await rotateRefreshToken({
+    currentToken: refreshToken,
+    replacementToken: replacementRefreshToken,
+    userId: user.id,
+    replacementExpiresAt: new Date(replacementDecoded.exp * 1000)
+  });
+
+  if (!rotated) {
+    throw new AppError('Refresh token already used.', 409);
+  }
+
+  return {
+    accessToken: replacementAccessToken,
+    refreshToken: replacementRefreshToken
+  };
 }
 
 export async function logoutUser(refreshToken: string): Promise<void> {
