@@ -2,7 +2,12 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "paths": {
+      "@collabcode/shared-types": ["../../packages/shared-types/src/index.ts"],
+      "@collabcode/shared-utils": ["../../packages/shared-utils/src/index.ts"],
+      "@collabcode/shared-config": ["../../packages/shared-config/src/index.ts"]
+    }
   },
   "ts-node": {
     "transpileOnly": true,
@@ -12,6 +17,7 @@
     ]
   },
   "include": [
-    "src"
+    "src",
+    "tests"
   ]
 }
