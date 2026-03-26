@@ -1,18 +1,25 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src",
     "outDir": "dist",
     "paths": {
-      "@collabcode/shared-types": ["../../packages/shared-types/src/index.ts"],
-      "@collabcode/shared-utils": ["../../packages/shared-utils/src/index.ts"],
-      "@collabcode/shared-config": ["../../packages/shared-config/src/index.ts"]
+      "@collabcode/shared-types": [
+        "../../packages/shared-types/src/index.ts"
+      ],
+      "@collabcode/shared-utils": [
+        "../../packages/shared-utils/src/index.ts"
+      ],
+      "@collabcode/shared-config": [
+        "../../packages/shared-config/src/index.ts"
+      ]
     }
   },
   "ts-node": {
     "transpileOnly": true,
     "files": true,
-    "require": ["tsconfig-paths/register"]
+    "require": [
+      "tsconfig-paths/register"
+    ]
   },
   "include": [
     "src",
