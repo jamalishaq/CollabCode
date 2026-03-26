@@ -1,19 +1,24 @@
+import { LOCK_RENEW_INTERVAL_SECONDS } from '@collabcode/shared-config';
 import { useEffect } from 'react';
 
+import { acquireLock, releaseLock } from '../services/fileService';
+
 /** useFileLock handles lock acquire/release and heartbeat renewal. */
-export function useFileLock(fileId: string | null): void {
+export function useFileLock(projectId: string | null, fileId: string | null): void {
   useEffect(() => {
-    if (!fileId) {
+    if (!projectId || !fileId) {
       return;
     }
 
+    void acquireLock(projectId, fileId);
+
     const interval = window.setInterval(() => {
-      void fetch(`/api/files/${fileId}/lock/renew`, { method: 'POST', credentials: 'include' });
-    }, 15_000);
+      void acquireLock(projectId, fileId);
+    }, LOCK_RENEW_INTERVAL_SECONDS * 1000);
 
     return () => {
       window.clearInterval(interval);
-      void fetch(`/api/files/${fileId}/lock`, { method: 'DELETE', credentials: 'include' });
+      void releaseLock(projectId, fileId);
     };
-  }, [fileId]);
+  }, [projectId, fileId]);
 }

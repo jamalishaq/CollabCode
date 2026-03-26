@@ -1,7 +1,9 @@
+import { WsEventType } from '@collabcode/shared-types';
+
 /** Websocket event name constants. */
 export const WS_EVENTS = {
-  presenceUpdated: 'presence.updated',
-  cursorMoved: 'cursor.moved',
-  fileLocked: 'file.locked',
-  fileUnlocked: 'file.unlocked'
+  presenceUpdated: WsEventType.PresenceUpdated,
+  cursorMoved: WsEventType.CursorMoved,
+  fileLocked: WsEventType.FileLocked,
+  fileUnlocked: WsEventType.FileUnlocked
 } as const;
