@@ -5,7 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "nodemon -L",
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm --filter @collabcode/shared-types build && pnpm --filter @collabcode/shared-config build && pnpm --filter @collabcode/shared-utils build && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "echo \"No unit tests yet\"",
