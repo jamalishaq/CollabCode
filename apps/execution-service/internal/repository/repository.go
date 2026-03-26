@@ -1,107 +1,64 @@
 package repository
 
 import (
+	"bytes"
 	"context"
-	"encoding/base64"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
 
 	"github.com/collabcode/execution-service/internal/domain"
 )
 
-// SandboxRepository wraps Docker CLI operations.
+// SandboxRepository executes code in an isolated process workspace.
 type SandboxRepository struct{}
 
-// NewSandboxRepository creates a docker-backed repository.
-func NewSandboxRepository() (*SandboxRepository, error) {
-	if _, err := exec.LookPath("docker"); err != nil {
-		return nil, fmt.Errorf("docker binary not available: %w", err)
-	}
-	return &SandboxRepository{}, nil
+// NewSandboxRepository creates a process-backed repository.
+func NewSandboxRepository() *SandboxRepository {
+	return &SandboxRepository{}
 }
 
-// EnsureImage pulls the image if needed.
-func (r *SandboxRepository) EnsureImage(ctx context.Context, imageRef string) error {
-	if err := runCommand(ctx, "docker", "image", "inspect", imageRef); err == nil {
-		return nil
-	}
-	return runCommand(ctx, "docker", "pull", imageRef)
-}
-
-// CreateContainer creates an isolated execution container.
-func (r *SandboxRepository) CreateContainer(ctx context.Context, req domain.ExecutionRequest, lang domain.Language) (string, error) {
-	encodedCode := base64.StdEncoding.EncodeToString([]byte(req.Code))
-	writeFileCmd := fmt.Sprintf("echo %s | base64 -d > /workspace/%s", encodedCode, lang.FileName)
-	executeCmd := strings.Join(lang.RunCmd, " ")
-	fullCmd := writeFileCmd + " && " + executeCmd
-
-	containerName := fmt.Sprintf("execution-%s", req.ExecutionID)
-	args := []string{
-		"create",
-		"--name", containerName,
-		"--network", "none",
-		"--memory", "128m",
-		"--cpus", "0.5",
-		"--read-only",
-		"--security-opt", "no-new-privileges",
-		"--tmpfs", "/workspace:rw,nosuid,size=64m",
-		"--tmpfs", "/tmp:rw,nosuid,size=64m",
-		lang.Image,
-		"sh", "-lc", fullCmd,
-	}
-
-	out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+// Execute writes source to a temp workspace and runs it using local runtime binaries.
+func (r *SandboxRepository) Execute(ctx context.Context, req domain.ExecutionRequest, lang domain.Language) (string, string, int, error) {
+	tempDir, err := os.MkdirTemp("", "execution-"+req.ExecutionID+"-")
 	if err != nil {
-		return "", fmt.Errorf("docker create failed: %w: %s", err, strings.TrimSpace(string(out)))
+		return "", "", 1, err
+	}
+	defer os.RemoveAll(tempDir)
+
+	sourceFile := filepath.Join(tempDir, lang.FileName)
+	if err := os.WriteFile(sourceFile, []byte(req.Code), 0o600); err != nil {
+		return "", "", 1, err
 	}
 
-	return strings.TrimSpace(string(out)), nil
-}
-
-// StartContainer starts an execution container.
-func (r *SandboxRepository) StartContainer(ctx context.Context, containerID string) error {
-	return runCommand(ctx, "docker", "start", containerID)
-}
-
-// WaitContainer waits for a container to finish and returns exit code.
-func (r *SandboxRepository) WaitContainer(ctx context.Context, containerID string) (int64, error) {
-	out, err := exec.CommandContext(ctx, "docker", "wait", containerID).CombinedOutput()
-	if err != nil {
-		return 1, err
+	command := lang.CommandForFile(sourceFile)
+	if len(command) == 0 {
+		return "", "", 1, fmt.Errorf("runtime command not configured for %s", lang.Name)
 	}
 
-	trimmed := strings.TrimSpace(string(out))
-	var status int64 = 1
-	_, parseErr := fmt.Sscan(trimmed, &status)
-	if parseErr != nil {
-		return 1, parseErr
-	}
-	return status, nil
-}
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+	cmd.Dir = tempDir
 
-// Logs reads stdout and stderr logs.
-func (r *SandboxRepository) Logs(ctx context.Context, containerID string) (string, string, error) {
-	stdout, err := exec.CommandContext(ctx, "docker", "logs", "--stdout", containerID).CombinedOutput()
-	if err != nil {
-		return "", "", err
-	}
-	stderr, err := exec.CommandContext(ctx, "docker", "logs", "--stderr", containerID).CombinedOutput()
-	if err != nil {
-		return "", "", err
-	}
-	return string(stdout), string(stderr), nil
-}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
-// RemoveContainer force removes a container.
-func (r *SandboxRepository) RemoveContainer(ctx context.Context, containerID string) error {
-	return runCommand(ctx, "docker", "rm", "-f", containerID)
-}
-
-func runCommand(ctx context.Context, name string, args ...string) error {
-	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s %v failed: %w: %s", name, args, err, strings.TrimSpace(string(out)))
+	runErr := cmd.Run()
+	if runErr == nil {
+		return stdout.String(), stderr.String(), 0, nil
 	}
-	return nil
+
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return stdout.String(), stderr.String(), 1, ctx.Err()
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) {
+		return stdout.String(), stderr.String(), exitErr.ExitCode(), nil
+	}
+
+	return stdout.String(), stderr.String(), 1, runErr
 }

@@ -1,18 +1,23 @@
 # Execution Service
 
-Executes user-submitted code in isolated Docker containers with strict
-resource limits. Each execution is ephemeral — the container is created,
-runs once, and is immediately destroyed.
+Executes user-submitted code in isolated ephemeral process workspaces using
+host runtime binaries (no in-process Docker dependency). Each execution is
+created, runs once with timeout limits, and the workspace is immediately
+destroyed.
+
+> Planned fallback path: move/upgrade execution to Docker container spawning
+> once deployment infrastructure provides Docker daemon access.
 
 ---
 
 ## Responsibilities
 
 - Accept code execution requests with language and source code
-- Spawn an ephemeral Docker container per execution
-- Enforce resource limits: no network, 0.5 CPU, 128MB RAM, 10s timeout
-- Capture stdout, stderr, and exit code from the container
-- Destroy the container immediately after execution completes
+- Spawn an ephemeral process workspace per execution
+- Enforce execution timeout (10 seconds) and isolate execution in per-request temp directories
+- Capture stdout, stderr, and exit code from the runtime process
+- Destroy the workspace immediately after execution completes
+- Keep Docker-container spawning as a planned fallback path for stronger isolation when supported by infrastructure
 - Publish execution result to QStash for notification-service delivery
 
 ---

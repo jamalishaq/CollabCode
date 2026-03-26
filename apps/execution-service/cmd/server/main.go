@@ -14,11 +14,7 @@ import (
 func main() {
 	cfg := config.Load()
 
-	repo, err := repository.NewSandboxRepository()
-	if err != nil {
-		log.Fatalf("failed to initialize docker repository: %v", err)
-	}
-
+	repo := repository.NewSandboxRepository()
 	sandboxService := service.NewSandboxService(repo, cfg.ExecutionTimeout)
 	publisherService := service.NewPublisherService(cfg.QStashURL, cfg.QStashToken)
 	executionService := service.NewExecutionService(sandboxService, publisherService)
