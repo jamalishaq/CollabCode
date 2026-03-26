@@ -48,7 +48,7 @@ export async function listWorkspacesHandler(request: FastifyRequest, reply: Fast
 
   reply.send(
     success({
-      workspaces: workspaces.map((item) => ({
+      workspaces: workspaces.map((item: { workspace: { id: string; name: string }; role: string; memberCount: number }) => ({
         id: item.workspace.id,
         name: item.workspace.name,
         role: item.role,
@@ -71,7 +71,7 @@ export async function getWorkspaceHandler(
       name: workspace.name,
       description: workspace.description,
       ownerId: workspace.ownerId,
-      members: members.map((member) => ({
+      members: members.map((member: { userId: string; role: string }) => ({
         userId: member.userId,
         role: member.role
       })),

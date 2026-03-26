@@ -1,7 +1,12 @@
-import { prisma } from '../lib/prisma';
+import {
+  prisma,
+  type TransactionClient,
+  type WorkspaceMemberCountRecord,
+  type WorkspaceMemberWithWorkspaceRecord
+} from '../lib/prisma';
 
 export async function createWorkspace(input: { name: string; description?: string; ownerId: string }) {
-  return prisma.$transaction(async (trx) => {
+  return prisma.$transaction(async (trx: TransactionClient) => {
     const workspace = await trx.workspace.create({
       data: {
         name: input.name,
@@ -23,21 +28,23 @@ export async function createWorkspace(input: { name: string; description?: strin
 }
 
 export async function listWorkspacesForUser(userId: string) {
-  const memberships = await prisma.workspaceMember.findMany({
+  const memberships = (await prisma.workspaceMember.findMany({
     where: { userId, workspace: { deletedAt: null } },
     include: { workspace: true }
-  });
+  })) as WorkspaceMemberWithWorkspaceRecord[];
 
-  const workspaceIds = memberships.map((m) => m.workspaceId);
+  const workspaceIds = memberships.map((m: WorkspaceMemberWithWorkspaceRecord) => m.workspaceId);
   const counts = await prisma.workspaceMember.groupBy({
     by: ['workspaceId'],
     where: { workspaceId: { in: workspaceIds } },
     _count: { workspaceId: true }
   });
 
-  const countByWorkspace = new Map(counts.map((c) => [c.workspaceId, c._count.workspaceId]));
+  const countByWorkspace = new Map(
+    counts.map((c: WorkspaceMemberCountRecord) => [c.workspaceId, c._count.workspaceId])
+  );
 
-  return memberships.map((membership) => ({
+  return memberships.map((membership: WorkspaceMemberWithWorkspaceRecord) => ({
     workspace: membership.workspace,
     role: membership.role,
     memberCount: countByWorkspace.get(membership.workspaceId) ?? 0

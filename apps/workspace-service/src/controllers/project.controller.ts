@@ -48,7 +48,7 @@ export async function listProjectsHandler(
 
   reply.send(
     success({
-      projects: projects.map((project) => ({
+      projects: projects.map((project: { id: string; name: string; createdAt: Date }) => ({
         id: project.id,
         name: project.name,
         createdAt: project.createdAt
