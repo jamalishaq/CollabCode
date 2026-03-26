@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
+import { fileRoute } from './file.route';
 import { healthRoute } from './health.route';
 
 /**
@@ -8,4 +9,5 @@ import { healthRoute } from './health.route';
  */
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await healthRoute(app);
+  await fileRoute(app);
 }

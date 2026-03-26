@@ -1,3 +1,4 @@
+import { failure } from '@collabcode/shared-utils';
 import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import type { ZodSchema } from 'zod';
 
@@ -15,14 +16,27 @@ export function validateMiddleware<T>(schema: ZodSchema<T>): preHandlerHookHandl
     });
 
     if (!parsed.success) {
-      reply.status(422).send({
-        data: null,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Request validation failed.',
-          details: parsed.error.flatten()
-        }
-      });
+      return reply.status(422).send(
+        failure('VALIDATION_ERROR', 'Request validation failed.', parsed.error.flatten())
+      );
+    }
+
+    const data = parsed.data as {
+      body?: unknown;
+      query?: unknown;
+      params?: unknown;
+    };
+
+    if (data.body !== undefined) {
+      request.body = data.body;
+    }
+
+    if (data.query !== undefined) {
+      request.query = data.query;
+    }
+
+    if (data.params !== undefined) {
+      request.params = data.params;
     }
   };
 }
