@@ -1,7 +1,5 @@
+import { failure } from '@collabcode/shared-utils';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import jwt from 'jsonwebtoken';
-
-import { config } from '../config';
 
 /** Request user payload attached after JWT verification. */
 export interface AuthenticatedUser {
@@ -9,23 +7,32 @@ export interface AuthenticatedUser {
   email: string;
 }
 
+declare module 'fastify' {
+  interface FastifyRequest {
+    authUser: AuthenticatedUser;
+  }
+}
+
 /**
  * Verifies bearer token and attaches user claims to request context.
  * @param request Fastify request.
  * @param reply Fastify reply.
- * @throws Error when token is missing or invalid.
  */
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const authorization = request.headers.authorization;
   if (!authorization?.startsWith('Bearer ')) {
-    reply.status(401).send({ data: null, error: { code: 'UNAUTHENTICATED', message: 'Missing token' } });
+    reply.status(401).send(failure('UNAUTHENTICATED', 'Missing token'));
     return;
   }
 
-  const token = authorization.replace('Bearer ', '');
+  const token = authorization.replace('Bearer ', '').trim();
   try {
-    jwt.verify(token, config.JWT_SECRET);
+    const payload = request.server.jwt.verify<{ sub: string; email?: string }>(token);
+    request.authUser = {
+      userId: payload.sub,
+      email: payload.email ?? ''
+    };
   } catch {
-    reply.status(401).send({ data: null, error: { code: 'UNAUTHENTICATED', message: 'Invalid token' } });
+    reply.status(401).send(failure('UNAUTHENTICATED', 'Invalid token'));
   }
 }
