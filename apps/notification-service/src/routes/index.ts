@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 
 import { healthRoute } from './health.route';
+import { notificationRoute } from './notification.route';
 
 /**
  * Registers all API route modules.
@@ -8,4 +9,5 @@ import { healthRoute } from './health.route';
  */
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await healthRoute(app);
+  await notificationRoute(app);
 }
