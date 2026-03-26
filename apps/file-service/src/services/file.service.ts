@@ -182,12 +182,12 @@ export async function updateFile(projectId: string, fileId: string, content: str
     orderBy: { version: 'desc' }
   });
 
+  await uploadFileContent(projectId, fileId, content);
+
   const updated = await prisma.file.update({
     where: { id: fileId },
     data: { content }
   });
-
-  await uploadFileContent(projectId, fileId, content);
 
   await prisma.fileVersion.create({
     data: {
@@ -209,17 +209,17 @@ export async function deleteFile(projectId: string, fileId: string): Promise<voi
     throw new AppError('File is currently locked and cannot be deleted.', 409, 'FILE_LOCKED');
   }
 
-  await prisma.file.update({
-    where: { id: fileId },
-    data: { deletedAt: new Date() }
-  });
-
   await r2Client.send(
     new DeleteObjectCommand({
       Bucket: config.R2_BUCKET_NAME,
       Key: objectKey(projectId, fileId)
     })
   );
+
+  await prisma.file.update({
+    where: { id: fileId },
+    data: { deletedAt: new Date() }
+  });
 }
 
 export async function acquireLock(projectId: string, fileId: string, userId: string): Promise<SharedFileLock> {
