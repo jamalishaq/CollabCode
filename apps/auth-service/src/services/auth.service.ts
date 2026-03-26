@@ -69,7 +69,7 @@ export async function issueTokens(appJwt: JwtAdapter, user: UserWithProfile): Pr
 
 export async function registerUser(
   appJwt: JwtAdapter,
-  params: { email: string; password: string; name: string }
+  params: { email: string; password: string; firstName: string; lastName: string }
 ): Promise<{ user: ReturnType<typeof toPublicUser>; tokens: SessionTokens }> {
   const existing = await findUserByEmail(params.email);
   if (existing) {
@@ -80,7 +80,7 @@ export async function registerUser(
   const user = await createUser({
     email: params.email,
     passwordHash,
-    name: params.name
+    name: `${params.firstName} ${params.lastName}`.trim()
   });
 
   const tokens = await issueTokens(appJwt, user);

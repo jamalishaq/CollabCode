@@ -13,7 +13,8 @@ import {
 interface RegisterBody {
   email: string;
   password: string;
-  name: string;
+  firstName: string;
+  lastName: string;
 }
 
 interface LoginBody {
